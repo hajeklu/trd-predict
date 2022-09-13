@@ -94,7 +94,7 @@ def trainModel(trainCandles, prediction_minutes = 60):
         y_train, 
         validation_data=(x_test, y_test), 
         epochs=5, 
-        batch_size=32,
+        batch_size=16,
         use_multiprocessing = False,
         max_queue_size=100,
         workers = 0)
@@ -164,5 +164,5 @@ candles.extend(csvToCandles('../data/2015.csv'))
 candles.extend(csvToCandles('../data/2014.csv'))
 candles.extend(csvToCandles('../data/2013.csv'))
 candles.extend(csvToCandles('../data/2012.csv'))
-trainModel(candles, 60)
+trainModel(candles, 10)
 #testModel('lstm_1m_model')
