@@ -99,7 +99,7 @@ def trainModel(trainCandles, prediction_minutes = 60):
         max_queue_size=100,
         workers = 0)
 
-    model.save('lstm_1m_model')
+    model.save('lstm_1m_60m_model')
 
 def testModel(name):
     model = load_model(name)
@@ -164,5 +164,5 @@ candles.extend(csvToCandles('../data/2015.csv'))
 candles.extend(csvToCandles('../data/2014.csv'))
 candles.extend(csvToCandles('../data/2013.csv'))
 candles.extend(csvToCandles('../data/2012.csv'))
-trainModel(candles, 10)
+trainModel(candles, 60)
 #testModel('lstm_1m_model')
