@@ -80,7 +80,7 @@ def trainModel(trainCandles, prediction_minutes = 60, model_name = 'lstm_1m_10_m
     print("Total size of samples: " + str(len(x_test)))
     model=None
 
-    if (os._exists(model_name)): # you won't have a model for first iteration
+    if (os.path.abspath("./" + model_name)): # you won't have a model for first iteration
         print("Loading model..")
         model = load_model(model_name)
     else:
