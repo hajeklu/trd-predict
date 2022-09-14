@@ -100,7 +100,7 @@ def trainModel(trainCandles, prediction_minutes = 60, model_name = 'lstm_1m_10_m
         x_train, 
         y_train, 
         validation_data=(x_test, y_test), 
-        epochs=5, 
+        epochs=8, 
         batch_size=32,
         use_multiprocessing = False,
         max_queue_size=100,
