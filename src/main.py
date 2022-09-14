@@ -4,6 +4,7 @@
 from ast import ListComp
 from pickletools import optimize
 import numpy as np
+import os
 import matplotlib.pyplot as plt
 import pandas as pd
 import datetime as dt
@@ -32,7 +33,7 @@ def csvToCandles(file):
     return data
 
 
-def trainModel(trainCandles, prediction_minutes = 60):
+def trainModel(trainCandles, prediction_minutes = 60, model_name = 'lstm_1m_10_model'):
     tf.keras.backend.clear_session()
     # scale
     print("Scaling..")
@@ -77,18 +78,22 @@ def trainModel(trainCandles, prediction_minutes = 60):
 
 
     print("Total size of samples: " + str(len(x_test)))
+    model=None
 
-    # Building model
-    model = Sequential()
-    model.add(LSTM(units=50, return_sequences=True, input_shape=(x_train.shape[1], x_train.shape[2])))
-    model.add(Dropout(0.2))
-    model.add(LSTM(units=50, return_sequences=True))
-    model.add(Dropout(0.2))
-    model.add(LSTM(units=50))
-    model.add(Dropout(0.2))
-    model.add(Dense(units=4))
-
-    model.compile(optimizer='Adam', loss='mean_squared_error', metrics=["accuracy"])
+    if (os._exists(model_name)): # you won't have a model for first iteration
+        model = load_model(model_name)
+    else:
+        model = Sequential()
+        model.add(LSTM(units=50, return_sequences=True, input_shape=(x_train.shape[1], x_train.shape[2])))
+        model.add(Dropout(0.2))
+        model.add(LSTM(units=50, return_sequences=True))
+        model.add(Dropout(0.2))
+        model.add(LSTM(units=50))
+        model.add(Dropout(0.2))
+        model.add(Dense(units=4))
+        model.compile(optimizer='Adam', loss='mean_squared_error', metrics=["accuracy"])
+    
+    
     history = model.fit(
         x_train, 
         y_train, 
@@ -99,7 +104,8 @@ def trainModel(trainCandles, prediction_minutes = 60):
         max_queue_size=100,
         workers = 0)
 
-    model.save('lstm_1m_60m_model')
+    model.save(model_name)
+
 
 def testModel(name):
     model = load_model(name)
@@ -144,25 +150,27 @@ def testModel(name):
     plt.show()
 
 
+file_to_load = ['../data/202208.csv',
+                '../data/2021.csv',
+                '../data/2020.csv',
+                '../data/2019.csv',
+                '../data/2018.csv',
+                '../data/2017.csv',
+                '../data/2016.csv',
+                '../data/2015.csv',
+                '../data/2014.csv',
+                '../data/2013.csv',
+                '../data/2012.csv',
+                '../data/202207.csv',
+                '../data/202206.csv',
+                '../data/202205.csv',
+                '../data/202204.csv',
+                '../data/202203.csv',
+                '../data/202202.csv',
+                '../data/202201.csv'
+                ]
 
-
-candles = csvToCandles('../data/202208.csv')
-candles.extend(csvToCandles('../data/202207.csv'))
-candles.extend(csvToCandles('../data/202206.csv'))
-candles.extend(csvToCandles('../data/202205.csv'))
-candles.extend(csvToCandles('../data/202204.csv'))
-candles.extend(csvToCandles('../data/202203.csv'))
-candles.extend(csvToCandles('../data/202202.csv'))
-candles.extend(csvToCandles('../data/202201.csv'))
-candles.extend(csvToCandles('../data/2021.csv'))
-candles.extend(csvToCandles('../data/2020.csv'))
-candles.extend(csvToCandles('../data/2019.csv'))
-candles.extend(csvToCandles('../data/2018.csv'))
-candles.extend(csvToCandles('../data/2017.csv'))
-candles.extend(csvToCandles('../data/2016.csv'))
-candles.extend(csvToCandles('../data/2015.csv'))
-candles.extend(csvToCandles('../data/2014.csv'))
-candles.extend(csvToCandles('../data/2013.csv'))
-candles.extend(csvToCandles('../data/2012.csv'))
-trainModel(candles, 10)
-#testModel('lstm_1m_model')
+for train_chunk in file_to_load:
+    candles = csvToCandles(train_chunk)
+    trainModel(candles, 10, 'lstm_1m_10_model')
+    #testModel('lstm_1m_model')
