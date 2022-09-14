@@ -81,8 +81,10 @@ def trainModel(trainCandles, prediction_minutes = 60, model_name = 'lstm_1m_10_m
     model=None
 
     if (os._exists(model_name)): # you won't have a model for first iteration
+        print("Loading model..")
         model = load_model(model_name)
     else:
+        print("Creatng model..")
         model = Sequential()
         model.add(LSTM(units=50, return_sequences=True, input_shape=(x_train.shape[1], x_train.shape[2])))
         model.add(Dropout(0.2))
@@ -99,7 +101,7 @@ def trainModel(trainCandles, prediction_minutes = 60, model_name = 'lstm_1m_10_m
         y_train, 
         validation_data=(x_test, y_test), 
         epochs=5, 
-        batch_size=16,
+        batch_size=32,
         use_multiprocessing = False,
         max_queue_size=100,
         workers = 0)
@@ -107,13 +109,13 @@ def trainModel(trainCandles, prediction_minutes = 60, model_name = 'lstm_1m_10_m
     model.save(model_name)
 
 
-def testModel(name):
+def testModel(name, prediction_minutes = 60,):
     model = load_model(name)
     candles = csvToCandles('../data/202209.csv')
 
     test_data = []
-    for c in range(0, 10):
-        oneTestCandles = candles[0+c: 60+c]
+    for c in range(0, len(candles) - prediction_minutes):
+        oneTestCandles = candles[0+c: prediction_minutes+c]
         oneTestCandlesTransformed = []
         for oneCandle in oneTestCandles:
             oneTestCandlesTransformed.append([oneCandle.open, oneCandle.low, oneCandle.high, oneCandle.close])
@@ -151,16 +153,16 @@ def testModel(name):
 
 
 file_to_load = ['../data/202208.csv',
-                '../data/2021.csv',
-                '../data/2020.csv',
-                '../data/2019.csv',
-                '../data/2018.csv',
-                '../data/2017.csv',
-                '../data/2016.csv',
-                '../data/2015.csv',
-                '../data/2014.csv',
-                '../data/2013.csv',
                 '../data/2012.csv',
+                '../data/2013.csv',
+                '../data/2014.csv',
+                '../data/2015.csv',
+                '../data/2016.csv',
+                '../data/2017.csv',
+                '../data/2018.csv',
+                '../data/2019.csv',
+                '../data/2020.csv',
+                '../data/2021.csv',
                 '../data/202207.csv',
                 '../data/202206.csv',
                 '../data/202205.csv',
