@@ -90,9 +90,9 @@ def trainModel(trainCandles, prediction_minutes = 60, model_name = 'lstm_1m_10_m
         model = Sequential()
         model.add(LSTM(units=5, return_sequences=True, input_shape=(x_train.shape[1], x_train.shape[2])))
         model.add(Dropout(0.2))
-        model.add(LSTM(units=500, return_sequences=True))
+        model.add(LSTM(units=100, return_sequences=True))
         model.add(Dropout(0.2))
-        model.add(LSTM(units=500))
+        model.add(LSTM(units=100))
         model.add(Dropout(0.2))
         model.add(Dense(units=4))
         model.compile(optimizer='Adam', loss='mean_squared_error', metrics=["accuracy"])
@@ -196,6 +196,7 @@ def main():
     for train_chunk in file_to_load:
         size_of_file = len(csvToCandles(train_chunk))
         candles_to_train = normalized_all_candles[count:count+size_of_file]
+        count = count + size_of_file
         trainModel(candles_to_train, 48, 'lstm_1h_48_model')
 
 
