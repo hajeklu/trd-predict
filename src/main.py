@@ -2,6 +2,7 @@
 
 
 from ast import ListComp
+from cProfile import label
 from pickletools import optimize
 import numpy as np
 import os
@@ -32,28 +33,28 @@ def csvToCandles(file):
             data.append(Candle(date, openn, low, high, close, CandleTime.minute))
     return data
 
-
-def trainModel(trainCandles, prediction_minutes = 60, model_name = 'lstm_1m_10_model'):
-    tf.keras.backend.clear_session()
-    # scale
+def normalize_candles(candles):
     print("Scaling..")
     scaler = MinMaxScaler(feature_range=(0,1))
-    opens = scaler.fit_transform([[o.open] for o in trainCandles])
-    highs = scaler.fit_transform([[o.high] for o in trainCandles])
-    lows = scaler.fit_transform([[o.low] for o in trainCandles])
-    closes = scaler.fit_transform([[o.close] for o in trainCandles])
+    opens = scaler.fit_transform([[o.open] for o in candles])
+    highs = scaler.fit_transform([[o.high] for o in candles])
+    lows = scaler.fit_transform([[o.low] for o in candles])
+    closes = scaler.fit_transform([[o.close] for o in candles])
     normalizedCandles = []
 
-    for i in range(0, len(trainCandles)):
-        date = trainCandles[i]
+    for i in range(0, len(candles)):
+        date = candles[i].date
         openn = float(opens[i][0])
         high = float(highs[i][0])
         low = float(lows[i][0])
         close = float(closes[i][0])
         normalizedCandles.append(Candle(date, openn, low, high, close, CandleTime.minute))
+    return normalizedCandles
 
 
-
+def trainModel(trainCandles, prediction_minutes = 60, model_name = 'lstm_1m_10_model'):
+    tf.keras.backend.clear_session()
+    normalizedCandles = trainCandles
     #Prepare Data
     print("Preparing data..")
     x_train = []
@@ -100,29 +101,27 @@ def trainModel(trainCandles, prediction_minutes = 60, model_name = 'lstm_1m_10_m
         x_train, 
         y_train, 
         validation_data=(x_test, y_test), 
-        epochs=8, 
-        batch_size=32,
-        use_multiprocessing = False,
-        max_queue_size=100,
-        workers = 0)
+        epochs=5, 
+        batch_size=32)
 
     model.save(model_name)
 
 
-def testModel(name, prediction_minutes = 60,):
+def testModel(name, prediction_minutes = 60):
     model = load_model(name)
     candles = csvToCandles('../data/202209.csv')
+    candles = normalize_candles(candles)
+    candles = candles[:100]
 
     test_data = []
-    for c in range(0, len(candles) - prediction_minutes):
-        oneTestCandles = candles[0+c: prediction_minutes+c]
+    for c in range(prediction_minutes, len(candles)):
+        oneTestCandles = candles[c-prediction_minutes:c]
         oneTestCandlesTransformed = []
         for oneCandle in oneTestCandles:
             oneTestCandlesTransformed.append([oneCandle.open, oneCandle.low, oneCandle.high, oneCandle.close])
         test_data.append(oneTestCandlesTransformed)
 
     test_data = np.array(test_data)
-
     predict_candles = model.predict(test_data)
 
     predicted_data = []
@@ -131,48 +130,69 @@ def testModel(name, prediction_minutes = 60,):
 
 
 
-
-    candles = candles[60:70]
     # x axis values
-    x = [o.date for o in candles]
+    x = []
+    for c in candles:
+        x.append(c.date)
+
     # corresponding y axis values
-    y = [o.open for o in candles]
-    
+    y = [o.open for o in candles][prediction_minutes:]
+    x = x[prediction_minutes:]
+
     # plotting the points 
-    plt.plot(x, predicted_data)
+    plt.plot(x, predicted_data, label="Predicted")
+    plt.plot(x, y, label="Real")
+    plt.legend(loc="upper left")
     # naming the x axis
-    plt.xlabel('x - axis')
+    plt.xlabel('time')
     # naming the y axis
-    plt.ylabel('y - axis')
+    plt.ylabel('price')
     
     # giving a title to my graph
-    plt.title('My first graph!')
+    plt.title('Predict!')
     
     # function to show the plot
     plt.show()
 
 
-file_to_load = ['../data/202208.csv',
-                '../data/2012.csv',
-                '../data/2013.csv',
-                '../data/2014.csv',
-                '../data/2015.csv',
-                '../data/2016.csv',
-                '../data/2017.csv',
-                '../data/2018.csv',
-                '../data/2019.csv',
-                '../data/2020.csv',
-                '../data/2021.csv',
-                '../data/202207.csv',
-                '../data/202206.csv',
-                '../data/202205.csv',
-                '../data/202204.csv',
-                '../data/202203.csv',
-                '../data/202202.csv',
-                '../data/202201.csv'
-                ]
 
-for train_chunk in file_to_load:
-    candles = csvToCandles(train_chunk)
-    trainModel(candles, 10, 'lstm_1m_10_model')
-    #testModel('lstm_1m_model')
+def main():
+    file_to_load = ['../data/202208.csv',
+                    '../data/2012.csv',
+                    '../data/2013.csv',
+                    '../data/2014.csv',
+                    '../data/2015.csv',
+                    '../data/2016.csv',
+                    '../data/2017.csv',
+                    '../data/2018.csv',
+                    '../data/2019.csv',
+                    '../data/2020.csv',
+                    '../data/2021.csv',
+                    '../data/202207.csv',
+                    '../data/202206.csv',
+                    '../data/202205.csv',
+                    '../data/202204.csv',
+                    '../data/202203.csv',
+                    '../data/202202.csv',
+                    '../data/202201.csv'
+                    ]
+    # normalize all data
+    all_candles = []
+    for train_chunk in file_to_load:
+        candles = csvToCandles(train_chunk)
+        all_candles.extend(candles)
+    normalized_all_candles = normalize_candles(all_candles)
+
+    # taking data by size of file
+    count = 0
+    for train_chunk in file_to_load:
+        size_of_file = len(csvToCandles(train_chunk))
+        candles_to_train = normalized_all_candles[count:count+size_of_file]
+        trainModel(candles_to_train, 60, 'lstm_1m_60_model')
+
+
+
+
+
+main()
+    # testModel('lstm_1m_10_model', 10)
