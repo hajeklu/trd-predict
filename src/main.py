@@ -4,6 +4,7 @@
 from ast import ListComp
 from cProfile import label
 from pickletools import optimize
+from data_provider import readCSV
 import numpy as np
 import os
 import matplotlib.pyplot as plt
@@ -11,7 +12,7 @@ import pandas as pd
 import datetime as dt
 import tensorflow as tf
 import csv
-from candle import Candle, CandleTime, minuteToHour
+from candle import Candle, CandleTime
 
 from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import Sequential, load_model
@@ -87,11 +88,11 @@ def trainModel(trainCandles, prediction_minutes = 60, model_name = 'lstm_1m_10_m
     else:
         print("Creatng model..")
         model = Sequential()
-        model.add(LSTM(units=50, return_sequences=True, input_shape=(x_train.shape[1], x_train.shape[2])))
+        model.add(LSTM(units=5, return_sequences=True, input_shape=(x_train.shape[1], x_train.shape[2])))
         model.add(Dropout(0.2))
-        model.add(LSTM(units=50, return_sequences=True))
+        model.add(LSTM(units=500, return_sequences=True))
         model.add(Dropout(0.2))
-        model.add(LSTM(units=50))
+        model.add(LSTM(units=500))
         model.add(Dropout(0.2))
         model.add(Dense(units=4))
         model.compile(optimizer='Adam', loss='mean_squared_error', metrics=["accuracy"])
@@ -158,37 +159,44 @@ def testModel(name, prediction_minutes = 60):
 
 def main():
     file_to_load = ['../data/202208.csv',
-                    '../data/2012.csv',
-                    '../data/2013.csv',
-                    '../data/2014.csv',
-                    '../data/2015.csv',
-                    '../data/2016.csv',
-                    '../data/2017.csv',
-                    '../data/2018.csv',
-                    '../data/2019.csv',
-                    '../data/2020.csv',
-                    '../data/2021.csv',
                     '../data/202207.csv',
                     '../data/202206.csv',
                     '../data/202205.csv',
                     '../data/202204.csv',
                     '../data/202203.csv',
                     '../data/202202.csv',
-                    '../data/202201.csv'
+                    '../data/202201.csv',
+                    '../data/2021.csv',
+                    '../data/2020.csv',
+                    '../data/2019.csv',
+                    '../data/2018.csv',
+                    '../data/2017.csv',
+                    '../data/2016.csv',
+                    '../data/2015.csv',
+                    '../data/2014.csv',
+                    '../data/2013.csv',
+                    '../data/2012.csv',
+                    '../data/2011.csv',
+                    '../data/2010.csv',
+                    '../data/2009.csv',
+                    '../data/2008.csv',
+                    '../data/2007.csv',
+                    '../data/2006.csv',
                     ]
     # normalize all data
     all_candles = []
     for train_chunk in file_to_load:
-        candles = csvToCandles(train_chunk)
+        candles = readCSV(train_chunk, CandleTime.hour)
         all_candles.extend(candles)
     normalized_all_candles = normalize_candles(all_candles)
 
+    print("Total count of candles: " + str(len(candles)))
     # taking data by size of file
     count = 0
     for train_chunk in file_to_load:
         size_of_file = len(csvToCandles(train_chunk))
         candles_to_train = normalized_all_candles[count:count+size_of_file]
-        trainModel(candles_to_train, 60, 'lstm_1m_60_model')
+        trainModel(candles_to_train, 48, 'lstm_1h_48_model')
 
 
 
