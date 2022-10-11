@@ -4,8 +4,7 @@ from candle import Candle, CandleTime
 
 def readCSV(path, candleTime):
     # Load data
-    print("Loading: " + path)
-    # ../data_202207.csv
+    #print("Loading: " + path)
     data = pd.read_csv(path, names=['Date_Time', 'open', 'high', 'low', 'close', 'volume'], sep=";", index_col=0)
 
     # Convert the index to datetime
@@ -16,19 +15,10 @@ def readCSV(path, candleTime):
                                  'high': 'max', 
                                  'low': 'min', 
                                  'close': 'last'})
-
-    candles = []
-    for index, row in data.iterrows():
-        date = index
-        openn = float(row['open'])
-        high = float(row['high'])
-        low = float(row['low'])
-        close = float(row['close'])
-        candles.append(Candle(date, openn, low, high, close, CandleTime.minute))
-    return candles
-
-    
-
-    
-
-readCSV('../data/202208.csv', CandleTime.hour)
+    if(candleTime == CandleTime.day):
+        data = data.resample('24H').agg({'open': 'first', 
+                            'high': 'max', 
+                            'low': 'min', 
+                            'close': 'last'})
+            
+    return data

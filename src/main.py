@@ -18,118 +18,86 @@ from sklearn.preprocessing import MinMaxScaler
 from tensorflow.keras.models import Sequential, load_model
 from tensorflow.keras.layers import Dense, Dropout,  LSTM
 
-def csvToCandles(file):
-    # Load data
-    print("Loading: " + file)
-    data = []
-    # ../data_202207.csv
-    with open(file, newline='') as csvfile:
-        spamreader = csv.reader(csvfile, delimiter=';', quotechar='|')
-        for row in spamreader:
-            date = row[0]
-            openn = float(row[1])
-            high = float(row[2])
-            low = float(row[3])
-            close = float(row[4])
-            data.append(Candle(date, openn, low, high, close, CandleTime.minute))
-    return data
 
 def normalize_candles(candles):
     print("Scaling..")
-    scaler = MinMaxScaler(feature_range=(0,1))
-    opens = scaler.fit_transform([[o.open] for o in candles])
-    highs = scaler.fit_transform([[o.high] for o in candles])
-    lows = scaler.fit_transform([[o.low] for o in candles])
-    closes = scaler.fit_transform([[o.close] for o in candles])
-    normalizedCandles = []
-
-    for i in range(0, len(candles)):
-        date = candles[i].date
-        openn = float(opens[i][0])
-        high = float(highs[i][0])
-        low = float(lows[i][0])
-        close = float(closes[i][0])
-        normalizedCandles.append(Candle(date, openn, low, high, close, CandleTime.minute))
-    return normalizedCandles
+    scaler = MinMaxScaler(feature_range=(-1, 1))
+    candles[['open', 'high', 'low', 'close']] = scaler.fit_transform(
+        candles[['open', 'high', 'low', 'close']])
+    return candles
 
 
-def trainModel(trainCandles, prediction_minutes = 60, model_name = 'lstm_1m_10_model'):
+def trainModel(trainCandles, prediction_minutes=60, model_name='lstm_1m_10_model'):
     tf.keras.backend.clear_session()
-    normalizedCandles = trainCandles
-    #Prepare Data
+    # Prepare Data
     print("Preparing data..")
+
     x_train = []
     y_train = []
-
+    normalizedCandles = trainCandles[[
+        'open', 'high', 'low', 'close', 'avg_price', 'ohlc_price', 'oc_diff']].to_numpy(copy=True)
     for x in range(prediction_minutes, len(normalizedCandles)):
         xdata = normalizedCandles[x-prediction_minutes:x]
         predictionData = []
         for candleX in xdata:
-            predictionData.append([candleX.open, candleX.low, candleX.high, candleX.close])
+            predictionData.append(
+                [candleX[0], candleX[1], candleX[2], candleX[3], candleX[4], candleX[5], candleX[6]])
         candleY = normalizedCandles[x]
         x_train.append(predictionData)
-        y_train.append([candleY.open, candleY.low, candleY.high, candleY.close])
+        y_train.append([candleY[0], candleY[1], candleY[2],
+                       candleY[3], candleY[4], candleY[5], candleY[6]])
 
+    print("Spliting..")
     # split train and test
     x_toSplit, y_toSplit = x_train, y_train
-    sizeOf70percentage = int(len(x_toSplit)/100*70)
+    sizeOf70percentage = int(len(x_toSplit)/.90)
     x_test = np.array(x_toSplit[sizeOf70percentage:len(x_toSplit)])
     y_test = np.array(y_toSplit[sizeOf70percentage:len(x_toSplit)])
     x_train = np.array(x_toSplit[0: sizeOf70percentage])
     y_train = np.array(y_toSplit[0: sizeOf70percentage])
 
+    print("Total size of samples: " + str(len(x_train)))
+    model = None
 
-    print("Total size of samples: " + str(len(x_test)))
-    model=None
-
-    if (os.path.isdir(model_name)): # you won't have a model for first iteration
+    if (os.path.isdir(model_name)):  # you won't have a model for first iteration
         print("Loading model..")
         model = load_model(model_name)
     else:
         print("Creatng model..")
         model = Sequential()
-        model.add(LSTM(units=5, return_sequences=True, input_shape=(x_train.shape[1], x_train.shape[2])))
+        model.add(LSTM(units=50, return_sequences=True,
+                  input_shape=(x_train.shape[1], x_train.shape[2])))
         model.add(Dropout(0.2))
-        model.add(LSTM(units=100, return_sequences=True))
+        model.add(LSTM(units=50, return_sequences=True))
         model.add(Dropout(0.2))
-        model.add(LSTM(units=100))
+        model.add(LSTM(units=50))
         model.add(Dropout(0.2))
-        model.add(Dense(units=4))
-        model.compile(optimizer='Adam', loss='mean_squared_error', metrics=["accuracy"])
-    
-    
+        model.add(Dense(units=7))
+        model.compile(optimizer='Adam', loss='mean_squared_error',
+                      metrics=['mae', 'mse'])
+
     history = model.fit(
-        x_train, 
-        y_train, 
-        validation_data=(x_test, y_test), 
-        epochs=5, 
+        x_train,
+        y_train,
+        validation_data=(x_test, y_test),
+        epochs=10,
         batch_size=32)
 
     model.save(model_name)
 
 
-def testModel(name, prediction_minutes = 60):
+def testModel(name, prediction_minutes=60):
     model = load_model(name)
-    candles = csvToCandles('../data/202209.csv')
-    candles = normalize_candles(candles)
-    candles = candles[:100]
-
-    test_data = []
-    for c in range(prediction_minutes, len(candles)):
-        oneTestCandles = candles[c-prediction_minutes:c]
-        oneTestCandlesTransformed = []
-        for oneCandle in oneTestCandles:
-            oneTestCandlesTransformed.append([oneCandle.open, oneCandle.low, oneCandle.high, oneCandle.close])
-        test_data.append(oneTestCandlesTransformed)
-
-    test_data = np.array(test_data)
+    candles = readCSV('../data/202209.csv', CandleTime.minute).head(60)
+    candles = normalize_candles(candles[['open', 'high', 'low', 'close']])
+    test_data = np.array([candles])
     predict_candles = model.predict(test_data)
 
+    print(predict_candles)
+    return
     predicted_data = []
     for candle in predict_candles:
         predicted_data.append(candle[0])
-
-
 
     # x axis values
     x = []
@@ -140,7 +108,7 @@ def testModel(name, prediction_minutes = 60):
     y = [o.open for o in candles][prediction_minutes:]
     x = x[prediction_minutes:]
 
-    # plotting the points 
+    # plotting the points
     plt.plot(x, predicted_data, label="Predicted")
     plt.plot(x, y, label="Real")
     plt.legend(loc="upper left")
@@ -148,13 +116,35 @@ def testModel(name, prediction_minutes = 60):
     plt.xlabel('time')
     # naming the y axis
     plt.ylabel('price')
-    
+
     # giving a title to my graph
     plt.title('Predict!')
-    
+
     # function to show the plot
     plt.show()
 
+
+def plotCandleStick(candles):
+    import plotly.graph_objects as go
+
+    print(candles)
+
+    fig = go.Figure(data=[go.Candlestick(x=candles.index,
+                                         open=candles['open'],
+                                         high=candles['high'],
+                                         low=candles['low'],
+                                         close=candles['close'])])
+
+    fig.show()
+
+
+def addCountFeature(df):
+    # Add additional features
+    df['avg_price'] = (df['low'] + df['high']) / 2
+    # df['range'] = df['high'] - df['low']
+    df['ohlc_price'] = (df['low'] + df['high'] + df['open'] + df['close']) / 4
+    df['oc_diff'] = df['open'] - df['close']
+    return df
 
 
 def main():
@@ -183,25 +173,29 @@ def main():
                     '../data/2007.csv',
                     '../data/2006.csv',
                     ]
-    # normalize all data
-    all_candles = []
-    for train_chunk in file_to_load:
-        candles = readCSV(train_chunk, CandleTime.hour)
-        all_candles.extend(candles)
-    normalized_all_candles = normalize_candles(all_candles)
 
+    candles = pd.DataFrame()
+    # load all files
+    for train_chunk in file_to_load:
+        print("Loading: " + train_chunk)
+        loadedDataFrame = readCSV(train_chunk, CandleTime.hour)
+        candles = pd.concat([candles, loadedDataFrame])
+
+    candles = addCountFeature(candles)
+    print(candles.head())
+    candles = candles.dropna()
+    normalized_all_candles = normalize_candles(candles)
     print("Total count of candles: " + str(len(candles)))
     # taking data by size of file
     count = 0
+    trainModel(normalized_all_candles, 30, 'lstm_1d_30_model-5')
+
+    exit()
     for train_chunk in file_to_load:
-        size_of_file = len(csvToCandles(train_chunk))
+        size_of_file = len(readCSV(train_chunk, CandleTime.hour))
         candles_to_train = normalized_all_candles[count:count+size_of_file]
         count = count + size_of_file
-        trainModel(candles_to_train, 48, 'lstm_1h_48_model')
-
-
-
 
 
 main()
-    # testModel('lstm_1m_10_model', 10)
+testModel('lstm_1m_60_model')
